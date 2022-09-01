@@ -146,71 +146,60 @@ describe("Stake", function () {
             await expect(stake.depositEth({ value: 0 }))
                 .to.be.revertedWith("Stake: Submit ether");
         })
-        it("Should revert when the user does not have enough ether: ", async function () {
-            const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
-            const dep = ethers.BigNumber.from("9899992574686870000000")
-            await expect(stake.depositEth({ value: dep }))
-                .to.be.revertedWith("Stake: not enough ether");
-        })
 
     })
     describe("Withdraw-User", function () {
-        xit("Should call the function with correct args: ", async function () {
+        it("Should call the function with correct args: ", async function () {
             const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
             const depAmount = ethers.BigNumber.from("1000");
             await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
             await stakeToken.approve(stake.address, ethers.BigNumber.from("1000"));
+            await stakeToken.mint(caller.address, ethers.BigNumber.from("1000"));
+            await stakeToken.connect(caller).approve(stake.address, ethers.BigNumber.from("1000"));
 
-
+            await stake.connect(caller).deposit(depAmount)
             await stake.deposit(depAmount);
+
             expect(await stake.stakes(owner.address).status, 1);
             await mine(14);
-            const profit = await stake.profit()
-            await stakeToken.mint(stake.address, ethers.BigNumber.from("10000"));
-            await stakeToken.approve(owner.address, ethers.BigNumber.from(profit));
 
 
-            await stake.withdrawUser(1);
+            await stake.withdrawUser();
 
 
         })
 
-        xit("Should emit UserWithdraw event with correct args: ", async function () {
+        it("Should emit UserWithdraw event with correct args: ", async function () {
             const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
             const depAmount = ethers.BigNumber.from("1000");
             await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
             await stakeToken.approve(stake.address, ethers.BigNumber.from("1000"));
+            await stakeToken.mint(caller.address, ethers.BigNumber.from("1000"));
+            await stakeToken.connect(caller).approve(stake.address, ethers.BigNumber.from("1000"));
+
+            await stake.connect(caller).deposit(depAmount)
             await stake.deposit(depAmount);
             await mine(14);
-            await stakeToken.mint(stake.address, ethers.BigNumber.from("10000"));
 
-            await expect(stake.withdrawUser(1))
+            await expect(stake.withdrawUser())
                 .to.emit(stake, 'UserWithdraw')
                 .withArgs(owner.address, await stake.profit());
         })
 
         //requires
 
-        it("Should revert when the user submits invalid ID: ", async function () {
-            const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
-            const depAmount = ethers.BigNumber.from("1000");
-            await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
-            await stakeToken.approve(stake.address, ethers.BigNumber.from("1000"));
-            await stake.deposit(depAmount);
-
-            await expect(stake.withdrawUser(2))
-                .to.be.revertedWith("Stake: Invalid ID");
-        })
-
-
         it("Should revert when wants to withdraw before 10 blocks passed: ", async function () {
             const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
             const depAmount = ethers.BigNumber.from("1000");
             await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
             await stakeToken.approve(stake.address, ethers.BigNumber.from("1000"));
+            await stakeToken.mint(caller.address, ethers.BigNumber.from("1000"));
+            await stakeToken.connect(caller).approve(stake.address, ethers.BigNumber.from("1000"));
+
+            await stake.connect(caller).deposit(depAmount)
             await stake.deposit(depAmount);
 
-            await expect(stake.withdrawUser(1))
+            await expect(stake.withdrawUser())
                 .to.be.revertedWith("Stake: You should wait");
         })
 
@@ -220,24 +209,13 @@ describe("Stake", function () {
             await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
             await stakeToken.approve(stake.address, ethers.BigNumber.from("1000"));
             await stake.deposit(depAmount);
-            await mine(10);
 
-            await expect(stake.withdrawUser(1))
+            await mine(15);
+
+            await expect(stake.withdrawUser())
                 .to.be.revertedWith("Stake: not enough tokens");
         })
 
-        it("Should revert when the contract does not have enough tokens to withdraw: ", async function () {
-            const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
-            const depAmount = ethers.BigNumber.from("1000");
-            await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
-            await stakeToken.approve(stake.address, ethers.BigNumber.from("1000"));
-            await stake.deposit(depAmount);
-            await mine(14);
-            await stakeToken.mint(stake.address, ethers.BigNumber.from("10000"));
-
-            await expect(stake.withdrawUser(1))
-                .to.be.revertedWith("Stake: Not enough allowance");
-        })
     })
     describe("Withdraw-User-Ether", function () {
         it("Should call the function with correct args: ", async function () {
@@ -245,7 +223,7 @@ describe("Stake", function () {
             await stake.connect(caller).depositEth({ value: 1000 });
             await stake.depositEth({ value: 1000 });
             await mine(10);
-            await stake.withdrawUserEth(1);
+            await stake.withdrawUserEth();
 
             expect(await stake.stakes(owner.address).status, 1)
             expect(await stake.stakes(owner.address).etherAmount, 0)
@@ -258,21 +236,13 @@ describe("Stake", function () {
             await stake.depositEth({ value: 1000 });
             await mine(10);
 
-            await expect(stake.withdrawUserEth(1))
+            await expect(stake.withdrawUserEth())
                 .to.emit(stake, 'UserWithdraw')
                 .withArgs(owner.address, 1100);
         })
 
         //requires
 
-        it("Should revert when the user submits invalid ID: ", async function () {
-            const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
-            await stake.depositEth({ value: 1000 });
-            await mine(10);
-
-            await expect(stake.withdrawUserEth(2))
-                .to.be.revertedWith("Stake: Invalid ID");
-        })
 
 
         it("Should revert when wants to withdraw before 10 blocks passed: ", async function () {
@@ -281,7 +251,7 @@ describe("Stake", function () {
             await stake.depositEth({ value: 1000 });
             await mine(5);
 
-            await expect(stake.withdrawUserEth(1))
+            await expect(stake.withdrawUserEth())
                 .to.be.revertedWith("Stake: You should wait");
         })
 
@@ -290,9 +260,9 @@ describe("Stake", function () {
             await stake.connect(caller).depositEth({ value: 1000 });// for testing: increase contract ethbalance
             await stake.depositEth({ value: 1000 });
             await mine(15);
-            await stake.withdrawUserEth(1);
+            await stake.withdrawUserEth();
 
-            await expect(stake.withdrawUserEth(1))
+            await expect(stake.withdrawUserEth())
                 .to.be.revertedWith("Stake: You dont have ether");
         })
 
@@ -301,7 +271,7 @@ describe("Stake", function () {
             await stake.depositEth({ value: 1000 });
             await mine(15);
 
-            await expect(stake.withdrawUserEth(1))
+            await expect(stake.withdrawUserEth())
                 .to.be.revertedWith("Stake: not enough ether in the contract");
         })
 
@@ -309,7 +279,7 @@ describe("Stake", function () {
 
 
     describe("Withdraw-Owner", function () {
-        xit("Should transfer tokens with correct args: ", async function () {
+        it("Should transfer tokens with correct args: ", async function () {
             const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
             const depAmount = ethers.BigNumber.from("1000");
             await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
@@ -348,16 +318,20 @@ describe("Stake", function () {
                 .to.be.revertedWith("Stake: Too much token withdrawal");
         })
 
-        xit("Should emit OwnerWithdraw event with correct args: ", async function () {
+        it("Should emit OwnerWithdraw event with correct args: ", async function () {
             const { stake, owner, caller, stakeToken, otherAccount } = await loadFixture(deployStake);
             const depAmount = ethers.BigNumber.from("1000");
             await stakeToken.mint(owner.address, ethers.BigNumber.from("1000"));
             await stakeToken.approve(stake.address, ethers.BigNumber.from("1000"));
+            await stakeToken.mint(caller.address, ethers.BigNumber.from("1000"));
+            await stakeToken.connect(caller).approve(stake.address, ethers.BigNumber.from("1000"));
+
+            await stake.connect(caller).deposit(depAmount)
             await stake.deposit(depAmount);
             await mine(14);
-            await stakeToken.mint(stake.address, ethers.BigNumber.from("10000"));
 
-            await expect(stake.withdrawUser(50))
+
+            await expect(stake.withdrawOwner(50))
                 .to.emit(stake, 'OwnerWithdraw')
                 .withArgs(owner.address, 50);
         })

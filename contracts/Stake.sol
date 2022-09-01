@@ -49,7 +49,6 @@ contract Stake is Ownable {
         token = new StakeToken();
     }
 
-    //for testing
     function profit() public view returns (uint256) {
         return
             stakes[msg.sender].tokenAmount +
@@ -59,12 +58,17 @@ contract Stake is Ownable {
             100;
     }
 
+    function profitEth() public view returns (uint256) {
+        return
+            stakes[msg.sender].etherAmount +
+            (stakes[msg.sender].etherAmount *
+                ((block.number - stakes[msg.sender].depositTime) / 10) *
+                10) /
+            100;
+    }
+
     function depositEth() public payable {
         require(msg.value > 0, "Stake: Submit ether");
-        require(
-            address(msg.sender).balance >= msg.value,
-            "Stake: not enough ether"
-        );
 
         stakersNumber++;
         stakes[msg.sender] = User(
@@ -75,7 +79,7 @@ contract Stake is Ownable {
             Status.DEPOSITED
         );
 
-        ownerProfitEth = (msg.value * ownerFee) / 100;
+        ownerProfitEth += (msg.value * ownerFee) / 100;
 
         emit EtherDeposited(msg.sender, msg.value);
     }
@@ -83,22 +87,13 @@ contract Stake is Ownable {
     function deposit(uint256 _depAmount) public {
         require(_depAmount > 0, "Stake: Submit tokens");
         require(
-            IERC20(address(token)).balanceOf(msg.sender) >= _depAmount,
+            token.balanceOf(msg.sender) >= _depAmount,
             "Stake: not enough tokens"
         );
         require(
-            IERC20(address(token)).allowance(msg.sender, address(this)) >=
-                _depAmount,
+            token.allowance(msg.sender, address(this)) >= _depAmount,
             "Stake: Not enough allowance"
         );
-
-        IERC20(address(token)).transferFrom(
-            msg.sender,
-            address(this),
-            _depAmount
-        );
-
-        stakersNumber++;
         stakes[msg.sender] = User(
             stakersNumber,
             _depAmount,
@@ -106,14 +101,15 @@ contract Stake is Ownable {
             block.number,
             Status.DEPOSITED
         );
+        stakersNumber++;
 
-        ownerProfitToken = (_depAmount * ownerFee) / 100;
+        token.transferFrom(msg.sender, address(this), _depAmount);
+        ownerProfitToken += (_depAmount * ownerFee) / 100;
 
         emit Deposited(msg.sender, _depAmount);
     }
 
-    function withdrawUserEth(uint256 _id) public payable {
-        require(_id > 0 && _id <= stakes[msg.sender].id, "Stake: Invalid ID");
+    function withdrawUserEth() public payable {
         require(
             block.number >= stakes[msg.sender].depositTime + 10,
             "Stake: You should wait"
@@ -123,12 +119,7 @@ contract Stake is Ownable {
             "Stake: You dont have ether"
         );
         require(
-            address(this).balance >=
-                stakes[msg.sender].etherAmount +
-                    (stakes[msg.sender].etherAmount *
-                        ((block.number - stakes[msg.sender].depositTime) / 10) *
-                        10) /
-                    100,
+            address(this).balance >= profitEth(),
             "Stake: not enough ether in the contract"
         );
         uint256 transferAmount = stakes[msg.sender].etherAmount;
@@ -154,57 +145,26 @@ contract Stake is Ownable {
         );
     }
 
-    function withdrawUser(uint256 _id) public {
-        require(_id > 0 && _id <= stakes[msg.sender].id, "Stake: Invalid ID");
+    function withdrawUser() public {
         require(
             block.number >= stakes[msg.sender].depositTime + 10,
             "Stake: You should wait"
         );
         require(
-            IERC20(address(token)).balanceOf(address(this)) >=
-                stakes[msg.sender].tokenAmount +
-                    (stakes[msg.sender].tokenAmount *
-                        ((block.number - stakes[msg.sender].depositTime) / 10) *
-                        10) /
-                    100,
+            token.balanceOf(address(this)) >= profit(),
             "Stake: not enough tokens"
         );
 
-        require(
-            IERC20(address(token)).allowance(address(this), msg.sender) ==
-                stakes[msg.sender].tokenAmount +
-                    (stakes[msg.sender].tokenAmount *
-                        ((block.number - stakes[msg.sender].depositTime) / 10) *
-                        10) /
-                    100,
-            "Stake: Not enough allowance"
-        );
-
-        IERC20(address(token)).transferFrom(
-            address(this),
-            msg.sender,
-            stakes[msg.sender].tokenAmount +
-                (stakes[msg.sender].tokenAmount *
-                    ((block.number - stakes[msg.sender].depositTime) / 10) *
-                    10) /
-                100
-        );
-
+        stakes[msg.sender].tokenAmount == 0;
+        token.transfer(msg.sender, profit());
         stakes[msg.sender].status == Status.WITHDRAWED;
 
-        emit UserWithdraw(
-            msg.sender,
-            stakes[msg.sender].tokenAmount +
-                (stakes[msg.sender].tokenAmount *
-                    ((block.number - stakes[msg.sender].depositTime) / 10) *
-                    10) /
-                100
-        );
+        emit UserWithdraw(msg.sender, profit());
     }
 
     function withdrawOwner(uint256 _amount) public onlyOwner {
         require(
-            IERC20(address(token)).balanceOf(address(this)) >= _amount,
+            token.balanceOf(address(this)) >= _amount,
             "Stake: Not enought tokens"
         );
         require(
@@ -212,7 +172,8 @@ contract Stake is Ownable {
             "Stake: Too much token withdrawal"
         );
 
-        IERC20(address(token)).transferFrom(address(this), msg.sender, _amount);
+        ownerProfitToken -= _amount;
+        token.transfer(msg.sender, _amount);
 
         emit OwnerWithdraw(msg.sender, _amount);
     }
@@ -226,7 +187,7 @@ contract Stake is Ownable {
             _amountEth <= ownerProfitEth,
             "Stake: Too much ether withdrawal"
         );
-
+        ownerProfitEth - _amountEth;
         payable(msg.sender).transfer(_amountEth);
 
         emit OwnerWithdraw(msg.sender, _amountEth);
